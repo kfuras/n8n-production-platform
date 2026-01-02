@@ -1,0 +1,68 @@
+volumes:
+  minio_data:
+
+networks:
+  n8n-core-net:
+    name: n8n-core-net
+
+services:
+  minio:
+    image: quay.io/minio/minio
+    container_name: minio
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    volumes:
+      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      # MinIO Console (Web UI on port 9001)
+      - "traefik.http.routers.minio-console.rule=Host(`${MINIO_CONSOLE_HOST}`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls.certresolver=le"
+      - "traefik.http.routers.minio-console.service=minio-console"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+      - "traefik.http.routers.minio-console.middlewares=minio-ipallowlist"
+      - "traefik.http.middlewares.minio-ipallowlist.ipallowlist.sourcerange=${HOME_IP}/32"
+
+      # MinIO S3 API (port 9000)
+      - "traefik.http.routers.minio-api.rule=Host(`${MINIO_API_HOST}`)"
+      - "traefik.http.routers.minio-api.entrypoints=websecure"
+      - "traefik.http.routers.minio-api.tls.certresolver=le"
+      - "traefik.http.routers.minio-api.service=minio-api"
+      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+      
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO...';
+      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      mc mb myminio/$${NCA_BUCKET_NAME} --ignore-existing;
+      mc anonymous set download myminio/$${NCA_BUCKET_NAME};
+      echo \"MinIO bucket ($${NCA_BUCKET_NAME}) setup complete\";
+      mc mb myminio/$${BASEROW_S3_BUCKET} --ignore-existing;
+      mc anonymous set download myminio/$${BASEROW_S3_BUCKET};
+      echo \"MinIO bucket ($${BASEROW_S3_BUCKET}) setup complete\";
+      "
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - NCA_BUCKET_NAME=${NCA_BUCKET_NAME}
+      - BASEROW_S3_BUCKET=${BASEROW_S3_BUCKET}
+    networks:  ['n8n-core-net']
+    restart: "no"
+  

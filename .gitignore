@@ -1,0 +1,28 @@
+# NEVER commit unencrypted secrets
+.env
+secrets/production.env
+postiz.env
+
+# Ignore all docker-compose override files
+docker-compose-k*.yml
+
+# Allow encrypted files
+!secrets/*.enc
+!secrets/*.example
+
+# Runtime data
+n8n-core/.n8n/*
+n8n-core/backup/*
+shared/*
+deploy.log
+
+# Backups
+*.backup*
+
+# OS files
+.DS_Store
+
+# Database volumes and files
+volumes/db/data/
+volumes/db/nocodb.sql
+volumes/db/*.db

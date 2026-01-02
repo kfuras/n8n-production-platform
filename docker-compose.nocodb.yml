@@ -1,0 +1,46 @@
+volumes:
+  nocodb_data:
+  nocodb_postgres_data:
+
+networks:
+  n8n-core-net:
+    name: n8n-core-net
+
+services:
+  nocodb-postgres:
+    image: postgres:16-alpine
+    container_name: nocodb-postgres
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    environment:
+      - POSTGRES_DB=${NOCODB_DB}
+      - POSTGRES_USER=${NOCODB_USER}
+      - POSTGRES_PASSWORD=${NOCODB_PASSWORD}
+    volumes:
+      - nocodb_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${NOCODB_USER} -d ${NOCODB_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nocodb:
+    image: nocodb/nocodb:latest
+    container_name: nocodb
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    environment:
+      - NC_DB=pg://nocodb-postgres:5432?u=${NOCODB_USER}&p=${NOCODB_PASSWORD}&d=${NOCODB_DB}
+      - NC_PUBLIC_URL=https://${NOCODB_HOST}
+      - NC_DISABLE_TELE=true
+    volumes:
+      - nocodb_data:/usr/app/data
+    depends_on:
+      nocodb-postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nocodb.rule=Host(`${NOCODB_HOST}`)"
+      - "traefik.http.routers.nocodb.entrypoints=websecure"
+      - "traefik.http.routers.nocodb.tls.certresolver=le"
+      - "traefik.http.services.nocodb.loadbalancer.server.port=8080"

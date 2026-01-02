@@ -1,0 +1,63 @@
+volumes:
+  postiz_postgres_data:
+  postiz_redis_data:
+  postiz_config:
+  postiz_uploads:
+
+networks:
+  n8n-core-net:
+    name: n8n-core-net
+
+services:
+  postiz-postgres:
+    image: postgres:17-alpine
+    container_name: postiz-postgres
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    environment:
+      - POSTGRES_PASSWORD=${POSTIZ_DB_PASSWORD}
+      - POSTGRES_USER=${POSTIZ_DB_USER}
+      - POSTGRES_DB=${POSTIZ_DB_NAME}
+    volumes:
+      - postiz_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTIZ_DB_USER} -d ${POSTIZ_DB_NAME}']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  postiz-redis:
+    image: redis:7.2
+    container_name: postiz-redis
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - postiz_redis_data:/data
+
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: postiz
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    env_file: ./postiz.env
+    environment:
+      - TRUST_PROXY=true
+    volumes:
+      - postiz_config:/config/
+      - postiz_uploads:/uploads/
+    depends_on:
+      postiz-postgres:
+        condition: service_healthy
+      postiz-redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.postiz.rule=Host(`${POSTIZ_HOST}`)"
+      - "traefik.http.routers.postiz.entrypoints=websecure"
+      - "traefik.http.routers.postiz.tls.certresolver=le"
+      - "traefik.http.services.postiz.loadbalancer.server.port=5000"

@@ -1,0 +1,111 @@
+# This is the main docker-compose file for the n8n core stack with additional services.
+# It sets up the core services and includes other compose files for modularity.
+# 
+# Comment out the 'include' lines to disable specific services as needed.
+include: 
+  - docker-compose.baserow.yml      # BaseRow service (Airtable alternative)
+  - docker-compose.nocodb.yml       # NocoDB service (Airtable alternative)
+  - docker-compose.minio.yml        # MinIO service (S3-compatible storage)
+  - docker-compose.nca-toolkit.yml  # NCA Toolkit service (No-Code Architects Toolkit)
+  - docker-compose.kokoro-tts.yml   # Kokoro TTS service (Text-to-Speech)
+  - docker-compose.postiz.yml       # Postiz service (Social meddia publishing platform)
+
+volumes:
+  n8n_core_storage:
+  postgres_core_storage:
+  traefik_data:
+
+networks:
+  n8n-core-net:
+    name: n8n-core-net
+
+services:
+  traefik:
+    image: traefik:v3.6.2
+    container_name: traefik
+    restart: always
+    networks: ['n8n-core-net']
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      # Enable access logging
+      - "--accesslog=true"
+      # Enable error logging
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - traefik_data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  n8n-core-postgres:
+    image: postgres:16-alpine
+    container_name: n8n-core-postgres
+    networks: ['n8n-core-net']
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_core_storage:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n-core:
+    image: n8nio/n8n:2.1.4
+    container_name: n8n-core
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=n8n-core-postgres
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_USER_MANAGEMENT_JWT_SECRET}
+      - WEBHOOK_URL=https://${N8N_WEBHOOK}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_PORT=5678
+      - N8N_TRUST_PROXY=true
+      - N8N_PROXY_HOPS=1
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=true
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - N8N_SKIP_AUTH_ON_OAUTH_CALLBACK=false
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+    volumes:
+      - n8n_core_storage:/home/node/.n8n
+      - ./n8n-core/backup:/backup
+      - ./shared:/data/shared
+    depends_on:
+      n8n-core-postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n-ui.rule=Host(`${N8N_HOST}`)"
+      - "traefik.http.routers.n8n-ui.entrypoints=websecure"
+      - "traefik.http.routers.n8n-ui.tls.certresolver=le"
+      - "traefik.http.routers.n8n-webhooks.rule=Host(`${N8N_WEBHOOK}`)"
+      - "traefik.http.routers.n8n-webhooks.entrypoints=websecure"
+      - "traefik.http.routers.n8n-webhooks.tls.certresolver=le"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"

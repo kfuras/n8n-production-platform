@@ -1,0 +1,11 @@
+networks:
+  n8n-core-net:
+    name: n8n-core-net
+
+services:
+  kokoro-tts-cpu:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.2
+    container_name: kokoro-tts-cpu
+    networks: ['n8n-core-net']
+    restart: unless-stopped
+    # Kokoro is internal only - no Traefik labels

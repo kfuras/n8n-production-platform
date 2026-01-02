@@ -1,0 +1,30 @@
+networks:
+  n8n-core-net:
+    name: n8n-core-net
+
+services:
+  nca-toolkit:
+    image: stephengpope/no-code-architects-toolkit:latest
+    container_name: nca-toolkit
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    environment:
+      - API_KEY=${NCA_API_KEY}
+      - S3_ENDPOINT_URL=https://${MINIO_API_HOST}
+      - S3_ACCESS_KEY=${NCA_S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${NCA_S3_SECRET_KEY}
+      - S3_BUCKET_NAME=nca-toolkit
+      - S3_REGION=None
+      - MAX_QUEUE_LENGTH=3
+      - GUNICORN_WORKERS=2
+      - GUNICORN_TIMEOUT=600
+    cpus: 2
+    mem_limit: '4g'
+    depends_on:
+      - minio
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nca.rule=Host(`${NCA_HOST}`)"
+      - "traefik.http.routers.nca.entrypoints=websecure"
+      - "traefik.http.routers.nca.tls.certresolver=le"
+      - "traefik.http.services.nca.loadbalancer.server.port=8080"

@@ -1,0 +1,16 @@
+:80 {
+  handle /api/* {
+    reverse_proxy http://backend:8000
+  }
+
+  handle /ws/* {
+    reverse_proxy http://backend:8000
+  }
+
+  # Serve media through backend (backend will fetch from MinIO internally)
+  handle /media/* {
+    reverse_proxy http://backend:8000
+  }
+
+  reverse_proxy http://web-frontend:3000
+}
