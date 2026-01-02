@@ -12,7 +12,10 @@ Production-proven automation stack with encrypted GitOps workflows. Run n8n plus
  HTTPS -->|  Traefik  | -----> |    n8n    |
           +-----------+        +-----+-----+
                                       |
-                                      +--> PostgreSQL 16 (state)
+                                      +--> PostgreSQL 16 (n8n state)
+                                      +--> Baserow (no-code database)
+                                      +--> NocoDB (Airtable alternative)
+                                      +--> Postiz (social media publishing)
                                       +--> MinIO (S3-compatible storage)
                                       +--> Kokoro TTS (self-hosted voice)
                                       +--> NCA Toolkit (video processing)
@@ -27,14 +30,16 @@ All external traffic terminates at Traefik v3 with automatic TLS certificates an
 | Service                   | SaaS Monthly Cost | Self-Hosted      | Est. Savings    |
 |---------------------------|-------------------|------------------|-----------------|
 | TTS (ElevenLabs/OpenAI)   | \$22-$330         | \$0 (Kokoro)      | \$22-$330       |
-| Storage (AWS S3) **       | \$23+             | \$0 (MinIO)       | \$23+           |
-| Automation (Zapier) **    | \$20-$600         | \$0 (n8n)         | \$20-$600       |
-| Video processing (API) ** | \$15-$250         | \$0 (NCA Toolkit) | \$15-$250       |
-| **Total**                 | **\$80-$1,480/mo**| **EUR 24.49/mo**  | **\$55.51-$1,455.51/mo** |
+| Storage (AWS S3)          | \$23+             | \$0 (MinIO)       | \$23+           |
+| Automation (Zapier)       | \$20-$600         | \$0 (n8n)         | \$20-$600       |
+| Video processing (API)    | \$15-$250         | \$0 (NCA Toolkit) | \$15-$250       |
+| Database (Airtable)       | \$20-$54          | \$0 (NocoDB/Baserow) | \$20-$54     |
+| Social publishing (Buffer)| \$6-$120          | \$0 (Postiz)      | \$6-$120        |
+| **Total**                 | **\$106-$1,674/mo**| **EUR 24.49/mo** | **\$81.51-$1,649.51/mo** |
 
 _Indicative SaaS figures reflect commonly advertised mid-tier plans. Actual savings depend on usage._
 
-Runs on a single Hetzner ( EUR 9.9/month) with 20 TB traffic included. Enabling Hetzner backups adds 20% of the instance price (about EUR 4.90 extra).
+Runs on a single Hetzner VPS (EUR 9.9/month) with 20 TB traffic included. Enabling Hetzner backups adds 20% of the instance price (about EUR 4.90 extra).
 
 ---
 
@@ -42,7 +47,10 @@ Runs on a single Hetzner ( EUR 9.9/month) with 20 TB traffic included. Enabling 
 
 - n8n: workflow automation (Zapier alternative)
 - Traefik v3: reverse proxy with ACME TLS and IP allow lists
-- PostgreSQL 16: durable workflow state
+- PostgreSQL 16/17: durable state for n8n, NocoDB, and Postiz
+- Baserow: Airtable alternative with PostgreSQL backend
+- NocoDB: Airtable alternative with PostgreSQL backend
+- Postiz: open-source social media publishing platform
 - MinIO: S3-compatible object storage
 - Kokoro TTS: self-hosted text-to-speech API
 - NCA Toolkit: FFmpeg-based video rendering API
@@ -70,6 +78,8 @@ _Never commit private keys or unencrypted `.env` files. Track only the encrypted
 - Email and calendar automations
 - Batch data processing
 - High-volume text-to-speech (300+ requests/day)
+- No-code database applications with Baserow and NocoDB
+- Social media content scheduling and publishing with Postiz
 
 ---
 
@@ -105,8 +115,8 @@ rm sops
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/kfuras/n8n-production.git
-cd n8n-production
+git clone https://github.com/build-automate/n8n-production-platform.git
+cd n8n-production-platform
 ```
 
 ### First-Time Secrets Setup
@@ -118,15 +128,20 @@ cd n8n-production
    nano .env
    ```
 
-2. Fill in every value (hostnames, passwords, HOME_IP, and so on) and keep the file private on the server.
+2. Update `DOMAIN` and `HOME_IP` to match your environment. The example file contains working values for testing, but you should rotate all secrets for production use.
 
-### Required Secrets
+### Required Updates
 
-- `POSTGRES_*`, `N8N_*`, and `GENERIC_TIMEZONE` for n8n
-- `ACME_EMAIL` for Traefik certificates
-- `MINIO_*` credentials and hostnames
-- `NCA_*` API keys for the toolkit
-- `HOME_IP` for the MinIO console IP allow list
+- `DOMAIN` - your domain name (all service hostnames derive from this)
+- `HOME_IP` - your IP address for MinIO console access restriction
+
+### Recommended: Rotate These Secrets for Production
+
+- `POSTGRES_*`, `NOCODB_*`, `POSTIZ_DB_*` - database passwords
+- `N8N_ENCRYPTION_KEY`, `N8N_USER_MANAGEMENT_JWT_SECRET` - n8n secrets
+- `N8N_BASIC_AUTH_USER`, `N8N_BASIC_AUTH_PASSWORD` - n8n authentication
+- `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` - MinIO credentials
+- `NCA_API_KEY`, `NCA_S3_ACCESS_KEY`, `NCA_S3_SECRET_KEY` - NCA Toolkit keys
 
 > Want to track secrets in git and let the server auto-deploy? Jump to [Advanced: GitOps + Encrypted Secrets (SOPS)](#advanced-gitops--encrypted-secrets-sops).
 

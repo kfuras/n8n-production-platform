@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-REPO_DIR="/home/kaf/docker/n8n-stack"
-LOG_FILE="/home/kaf/docker/n8n-stack/deploy.log"
+REPO_DIR="/home/kaf/docker/n8n-production-platform"
+LOG_FILE="/home/kaf/docker/n8n-production-platform/deploy.log"
 
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
@@ -24,7 +24,17 @@ fi
 
 if git merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
     CHANGED_FILES=$(git diff --name-only "$LOCAL..$REMOTE")
-    WATCHED_FILES=("docker-compose.yml" "secrets/production.env.enc" "scripts/deploy.sh")
+    WATCHED_FILES=(
+        "docker-compose.yml"
+        "docker-compose.baserow.yml"
+        "docker-compose.nocodb.yml"
+        "docker-compose.postiz.yml"
+        "docker-compose.minio.yml"
+        "docker-compose.nca-toolkit.yml"
+        "docker-compose.kokoro-tts.yml"
+        "secrets/production.env.enc"
+        "scripts/deploy.sh"
+    )
     NEEDS_DEPLOY=false
 
     for file in "${WATCHED_FILES[@]}"; do
