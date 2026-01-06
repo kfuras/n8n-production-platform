@@ -7,9 +7,10 @@
     reverse_proxy http://backend:8000
   }
 
-  # Serve media through backend (backend will fetch from MinIO internally)
+  # Serve media files directly from the volume for better performance
   handle /media/* {
-    reverse_proxy http://backend:8000
+    root * /baserow
+    file_server
   }
 
   reverse_proxy http://web-frontend:3000
