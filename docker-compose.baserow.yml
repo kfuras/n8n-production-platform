@@ -6,7 +6,6 @@ volumes:
 
 networks:
   n8n-core-net:
-    external: true
 
 x-backend-variables:
   &backend-variables # Most users should only need to set these first four variables.
