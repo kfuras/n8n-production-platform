@@ -7,9 +7,9 @@
     reverse_proxy http://backend:8000
   }
 
-  # Serve media files directly from the volume for better performance
-  handle /media/* {
-    root * /baserow
+  # Serve media files directly from the volume
+  handle_path /media/* {
+    root * /baserow/media
     file_server
   }
 
