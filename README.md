@@ -120,7 +120,7 @@ Push to `main` triggers GitHub Actions. The workflow dispatches to a self-hosted
 
 ## Service URLs
 
-- **N8N**: `https://n8n.yourdomain.com`
+- **N8N**: `https://n8n.yourdomain.com` (UI and webhooks)
 - **BaseRow**: `https://baserow.yourdomain.com`
 - **NocoDB**: `https://nocodb.yourdomain.com`
 - **MinIO Console**: `https://minio-console.yourdomain.com`
