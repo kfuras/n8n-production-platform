@@ -77,7 +77,7 @@ services:
       - N8N_PERSONALIZATION_ENABLED=false
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
       - N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_USER_MANAGEMENT_JWT_SECRET}
-      - WEBHOOK_URL=https://${N8N_WEBHOOK}
+      - WEBHOOK_URL=${WEBHOOK_URL}
       - N8N_HOST=${N8N_HOST}
       - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
       - N8N_RUNNERS_ENABLED=true
@@ -102,10 +102,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.n8n-ui.rule=Host(`${N8N_HOST}`)"
-      - "traefik.http.routers.n8n-ui.entrypoints=websecure"
-      - "traefik.http.routers.n8n-ui.tls.certresolver=le"
-      - "traefik.http.routers.n8n-webhooks.rule=Host(`${N8N_WEBHOOK}`)"
-      - "traefik.http.routers.n8n-webhooks.entrypoints=websecure"
-      - "traefik.http.routers.n8n-webhooks.tls.certresolver=le"
+      - "traefik.http.routers.n8n.rule=Host(`${N8N_HOST}`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls.certresolver=le"
       - "traefik.http.services.n8n.loadbalancer.server.port=5678"

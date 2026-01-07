@@ -54,15 +54,11 @@ services:
       mc mb myminio/$${NCA_BUCKET_NAME} --ignore-existing;
       mc anonymous set download myminio/$${NCA_BUCKET_NAME};
       echo \"MinIO bucket ($${NCA_BUCKET_NAME}) setup complete\";
-      mc mb myminio/$${BASEROW_S3_BUCKET} --ignore-existing;
-      mc anonymous set download myminio/$${BASEROW_S3_BUCKET};
-      echo \"MinIO bucket ($${BASEROW_S3_BUCKET}) setup complete\";
       "
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - NCA_BUCKET_NAME=${NCA_BUCKET_NAME}
-      - BASEROW_S3_BUCKET=${BASEROW_S3_BUCKET}
     networks:  ['n8n-core-net']
     restart: "no"
   
