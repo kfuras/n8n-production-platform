@@ -358,6 +358,8 @@ services:
     environment:
       <<: *backend-variables
     stop_signal: SIGQUIT
+    healthcheck:
+      disable: true
     depends_on:
       - backend
     volumes:
