@@ -93,6 +93,9 @@ services:
       - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - SKOOL_EMAIL=${SKOOL_EMAIL}        # Optional - Used for Skool Automation
+      - SKOOL_PASSWORD=${SKOOL_PASSWORD}  # Optional - Used for Skool Automation
+      - SKOOL_GROUP_ID=${SKOOL_GROUP_ID}  # Optional - Used for Skool Automation
     volumes:
       - n8n_core_storage:/home/node/.n8n
       - ./n8n-core/backup:/backup
