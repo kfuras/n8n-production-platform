@@ -68,6 +68,7 @@ Runs on a single Hetzner VPS (EUR 9.99/month cx43) with 20 TB traffic included.
    - `DOMAIN` - your domain name
    - `HOME_IP` - your IP address
    - Rotate all secrets for production
+   - (Optional) `SKOOL_EMAIL`, `SKOOL_PASSWORD`, `SKOOL_GROUP_ID` - For personal Skool automation workflows
 
 4. **Deploy**
    ```bash
