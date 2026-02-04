@@ -3,6 +3,7 @@ volumes:
   postiz_redis_data:
   postiz_config:
   postiz_uploads:
+  temporal_postgres_data:
 
 networks:
   n8n-core-net:
@@ -22,8 +23,8 @@ services:
       - postiz_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTIZ_DB_USER} -d ${POSTIZ_DB_NAME}']
-      interval: 10s
-      timeout: 3s
+      interval: 30s
+      timeout: 10s
       retries: 3
 
   postiz-redis:
@@ -33,20 +34,109 @@ services:
     networks: ['n8n-core-net']
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 3s
+      interval: 30s
+      timeout: 10s
       retries: 3
     volumes:
       - postiz_redis_data:/data
 
+  # -----------------------
+  # Temporal Stack
+  # -----------------------
+  temporal-postgresql:
+    container_name: temporal-postgresql
+    image: postgres:16
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    environment:
+      POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD:-temporal}
+      POSTGRES_USER: ${TEMPORAL_DB_USER:-temporal}
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${TEMPORAL_DB_USER:-temporal}']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  temporal-elasticsearch:
+    container_name: temporal-elasticsearch
+    image: elasticsearch:7.17.27
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    environment:
+      - cluster.routing.allocation.disk.threshold_enabled=true
+      - cluster.routing.allocation.disk.watermark.low=512mb
+      - cluster.routing.allocation.disk.watermark.high=256mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=128mb
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - xpack.security.enabled=false
+    volumes:
+      - /var/lib/elasticsearch/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -s http://localhost:9200 >/dev/null || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  temporal:
+    container_name: temporal
+    image: temporalio/auto-setup:1.28.1
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    ports:
+      - '${TEMPORAL_PORT:-7233}:7233'
+    depends_on:
+      temporal-postgresql:
+        condition: service_healthy
+      temporal-elasticsearch:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${TEMPORAL_DB_USER:-temporal}
+      - POSTGRES_PWD=${TEMPORAL_DB_PASSWORD:-temporal}
+      - POSTGRES_SEEDS=temporal-postgresql
+      - ENABLE_ES=true
+      - ES_SEEDS=temporal-elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_NAMESPACE=default
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    healthcheck:
+      test: ['CMD', 'tctl', 'workflow', 'list']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:2.34.0
+    restart: unless-stopped
+    networks: ['n8n-core-net']
+    ports:
+      - '${TEMPORAL_UI_PORT:-8080}:8080'
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://127.0.0.1:3000
+    depends_on:
+      - temporal
+
+  # -----------------------
+  # Postiz
+  # -----------------------
   postiz:
-    image: ghcr.io/gitroomhq/postiz-app:latest
+    image: ghcr.io/kfuras/postiz-app:bluesky-link-previews
     container_name: postiz
     restart: unless-stopped
     networks: ['n8n-core-net']
     env_file: ./postiz.env
     environment:
       - TRUST_PROXY=true
+      - TEMPORAL_ADDRESS=temporal:7233
     volumes:
       - postiz_config:/config/
       - postiz_uploads:/uploads/
@@ -54,6 +144,8 @@ services:
       postiz-postgres:
         condition: service_healthy
       postiz-redis:
+        condition: service_healthy
+      temporal:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
