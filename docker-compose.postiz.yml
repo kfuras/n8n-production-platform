@@ -140,6 +140,7 @@ services:
     volumes:
       - postiz_config:/config/
       - postiz_uploads:/uploads/
+      - ./postiz.env:/app/.env:ro
     depends_on:
       postiz-postgres:
         condition: service_healthy
