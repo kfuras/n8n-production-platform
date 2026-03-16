@@ -1,4 +1,4 @@
-# N8N Production Stack with Self-Hosted AI Toolkit
+# N8N Production Stack with Self-Hosted Toolkit
 
 [![n8n](https://img.shields.io/badge/n8n-EA4B71?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/)
 [![Traefik](https://img.shields.io/badge/Traefik-24A1C1?style=for-the-badge&logo=traefikproxy&logoColor=white)](https://traefik.io/)
