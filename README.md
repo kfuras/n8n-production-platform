@@ -9,7 +9,7 @@
 [![Hetzner](https://img.shields.io/badge/Hetzner-D50C2D?style=for-the-badge&logo=hetzner&logoColor=white)](https://www.hetzner.com/cloud)
 [![Skool Community](https://img.shields.io/badge/Skool-Build_&_Automate-FF6154?style=for-the-badge)](https://www.skool.com/build-automate)
 
-Production-proven automation stack with encrypted GitOps workflows. Run n8n plus supporting AI services on a single Hetzner VPS with safe, reproducible deployments.
+Production-proven automation stack with encrypted GitOps workflows. Run n8n plus supporting services on a single Hetzner VPS with safe, reproducible deployments.
 
 ---
 
