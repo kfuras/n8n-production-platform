@@ -7,7 +7,6 @@
 [![SOPS](https://img.shields.io/badge/SOPS-000000?style=for-the-badge&logo=mozilla&logoColor=white)](https://github.com/getsops/sops)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Hetzner](https://img.shields.io/badge/Hetzner-D50C2D?style=for-the-badge&logo=hetzner&logoColor=white)](https://www.hetzner.com/cloud)
-[![Skool Community](https://img.shields.io/badge/Skool-Build_&_Automate-FF6154?style=for-the-badge)](https://www.skool.com/build-automate)
 
 Production-proven automation stack with encrypted GitOps workflows. Run n8n plus supporting services on a single Hetzner VPS with safe, reproducible deployments.
 
@@ -47,7 +46,7 @@ Runs on a single Hetzner VPS (EUR 9.99/month cx43) with 20 TB traffic included.
 
 1. **Clone repository**
    ```bash
-   git clone https://github.com/build-automate/n8n-production-platform.git
+   git clone https://github.com/kfuras/n8n-production-platform.git
    cd n8n-production-platform
    ```
 
@@ -183,7 +182,6 @@ docker compose ps
 
 - [Blog](https://kjetilfuras.com)
 - [LinkedIn](https://www.linkedin.com/in/kjetil-furas/)
-- [Skool community](https://www.skool.com/build-automate/about?ref=8708d3bb33f84fa2a3efd6b4ba05adb9)
 ---
 
-Built by Kjetil Furås. Questions? Open an issue or reach out on Skool.
+Built by Kjetil Furås. Questions? Open an issue.
