@@ -1,0 +1,78 @@
+name: Update n8n version
+
+# Weekly check for the latest stable n8n image. If a newer version exists,
+# opens a PR bumping the tag in docker-compose.yml and auto-merges it.
+# This only updates the repo (the source of truth); the new version rolls
+# out to the server on the next `make deploy`.
+#
+# CURRENT/LATEST are constrained to semver (X.Y.Z) by the grep/jq filters
+# below, so they are safe to interpolate into the shell.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-n8n:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine current and latest n8n version
+        id: ver
+        run: |
+          set -euo pipefail
+          current=$(grep -oP 'n8nio/n8n:\K[0-9]+\.[0-9]+\.[0-9]+' docker-compose.yml | head -1)
+          if [ -z "$current" ]; then
+            echo "Could not find pinned n8nio/n8n version in docker-compose.yml"; exit 1
+          fi
+          # Newest stable semver tag on Docker Hub (excludes latest/next/nightly/-rc).
+          latest=$(curl -fsSL "https://hub.docker.com/v2/repositories/n8nio/n8n/tags?page_size=100&ordering=last_updated" \
+            | jq -r '.results[].name | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' \
+            | sort -V | tail -1)
+          if [ -z "$latest" ]; then
+            echo "Could not determine latest n8n version from Docker Hub"; exit 1
+          fi
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          if [ "$current" = "$latest" ]; then
+            echo "update=false" >> "$GITHUB_OUTPUT"
+            echo "Already on latest n8n ($current)."
+          else
+            echo "update=true" >> "$GITHUB_OUTPUT"
+            echo "n8n update available: $current -> $latest"
+          fi
+
+      - name: Open and auto-merge version bump PR
+        if: steps.ver.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT: ${{ steps.ver.outputs.current }}
+          LATEST: ${{ steps.ver.outputs.latest }}
+        run: |
+          set -euo pipefail
+          BRANCH="auto/n8n-${LATEST}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+
+          sed -i "s|n8nio/n8n:${CURRENT}|n8nio/n8n:${LATEST}|" docker-compose.yml
+          git add docker-compose.yml
+          git commit -m "fix: update n8n to ${LATEST}"
+          git push -u origin "$BRANCH" --force
+
+          BODY=$(printf 'Automated n8n version bump.\n\n- Current: `%s`\n- Latest stable: `%s`\n\nRelease notes: https://github.com/n8n-io/n8n/releases\n\nThis updates the repo only; the new version rolls out on the next `make deploy`.' "$CURRENT" "$LATEST")
+
+          gh pr create --base main --head "$BRANCH" \
+            --title "Update n8n to ${LATEST}" \
+            --body "$BODY" \
+            || echo "PR already exists for $BRANCH, proceeding to merge."
+
+          gh pr merge "$BRANCH" --squash --delete-branch
