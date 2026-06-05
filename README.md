@@ -3,24 +3,25 @@
 [![n8n](https://img.shields.io/badge/n8n-EA4B71?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io/)
 [![Traefik](https://img.shields.io/badge/Traefik-24A1C1?style=for-the-badge&logo=traefikproxy&logoColor=white)](https://traefik.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![MinIO](https://img.shields.io/badge/MinIO-C72E49?style=for-the-badge&logo=minio&logoColor=white)](https://min.io/)
-[![SOPS](https://img.shields.io/badge/SOPS-000000?style=for-the-badge&logo=mozilla&logoColor=white)](https://github.com/getsops/sops)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Hetzner](https://img.shields.io/badge/Hetzner-D50C2D?style=for-the-badge&logo=hetzner&logoColor=white)](https://www.hetzner.com/cloud)
 
-Production-proven automation stack with encrypted GitOps workflows. Run n8n plus supporting services on a single Hetzner VPS with safe, reproducible deployments.
+Self-hosted n8n automation stack on a single Hetzner VPS. This repo holds the
+Docker Compose stack (the deployment payload). Provisioning and deployment are
+handled by the companion Infrastructure-as-Code repo
+[**n8n-hetzner-deploy**](https://github.com/kfuras/n8n-hetzner-deploy)
+(OpenTofu + Ansible). All external traffic terminates at Traefik v3 with
+automatic Let's Encrypt TLS.
 
 ---
 
 ## What Gets Created
 
-- **N8N** - Workflow automation platform with PostgreSQL database
-- **Traefik** - Automatic SSL certificates via Let's Encrypt
-- **Optional Services** - BaseRow, NocoDB, MinIO, Kokoro TTS, NCA Toolkit, Postiz
-- **Ubuntu server** with Docker and security hardening
-- **GitOps** - Encrypted secrets with SOPS, auto-deploy with GitHub Actions
-
-All external traffic terminates at Traefik v3 with automatic TLS certificates.
+- **N8N** - Workflow automation platform with a dedicated PostgreSQL database
+- **Traefik** - Reverse proxy with automatic SSL certificates via Let's Encrypt
+- **Optional Services** - BaseRow, NocoDB, MinIO, Kokoro TTS, NCA Toolkit, Postiz (toggled per deployment)
+- **Ubuntu server** with Docker and security hardening (provisioned by the deploy repo)
+- **Pinned, auto-updated images** - the n8n version is pinned and bumped weekly by CI (see below)
 
 ---
 
@@ -36,85 +37,56 @@ All external traffic terminates at Traefik v3 with automatic TLS certificates.
 | Social publishing (Buffer)| $6-$120          | $0 (Postiz)      | $6-$120         |
 | **Total**                 | **$106-$1,674/mo**| **EUR 9.99/mo** | **$96-$1,664/mo** |
 
-Runs on a single Hetzner VPS (EUR 9.99/month cx43) with 20 TB traffic included.
+Runs on a single Hetzner VPS (from EUR 9.99/month) with 20 TB traffic included.
 
 ---
 
-## Quick Start
+## How It's Deployed
 
-### Manual Deploy
+Deployment is **pull-based Infrastructure-as-Code**, driven entirely from the
+[n8n-hetzner-deploy](https://github.com/kfuras/n8n-hetzner-deploy) repo:
 
-1. **Clone repository**
-   ```bash
-   git clone https://github.com/kfuras/n8n-production-platform.git
-   cd n8n-production-platform
-   ```
+1. **OpenTofu** provisions the Hetzner server, firewall, and DNS expectations.
+2. **Ansible** (`make deploy`) configures the host, clones this repo onto the
+   server, generates secrets, and brings the stack up with Docker Compose.
+3. Re-running `make deploy` is **idempotent** - it fast-forwards the server to
+   the latest commit of this repo only when there is something new, then
+   reconciles the running containers.
 
-2. **Install tools**
-   ```bash
-   sudo apt-get install -y docker.io docker-compose-plugin age
-   wget https://github.com/mozilla/sops/releases/latest/download/sops-linux-amd64 -O sops
-   sudo install -m 0755 sops /usr/local/bin/sops
-   ```
+You do not deploy from this repo directly; you change the stack here, and the
+deploy repo rolls it out.
 
-3. **Configure**
-   ```bash
-   cp secrets/production.env.example .env
-   nano .env
-   ```
-   
-   Update:
-   - `DOMAIN` - your domain name
-   - `HOME_IP` - your IP address
-   - Rotate all secrets for production
-   - (Optional) `SKOOL_EMAIL`, `SKOOL_PASSWORD`, `SKOOL_GROUP_ID` - For personal Skool automation workflows
+### Secrets
 
-4. **Deploy**
-   ```bash
-   docker compose pull
-   docker compose up -d
-   ```
+- Secrets are **generated on the server** on first deploy (`openssl rand`) and
+  written to `~/stack/.env` with `0600` permissions.
+- **No real secrets are committed to git** - only [`secrets/production.env.example`](secrets/production.env.example), the template of expected keys.
+- The `N8N_ENCRYPTION_KEY` is the critical value: if lost, stored n8n
+  credentials become unreadable. Back it up off-server (e.g. a password
+  manager) after the first deploy.
+- See the deploy repo for how secrets and per-service values are seeded.
 
-5. **Access**
-   
-   Open `https://n8n.yourdomain.com` after DNS propagates
+### Configure (keys you set)
+
+In the deploy repo's variables / on first run:
+
+- `DOMAIN` - your domain name
+- `HOME_IP` - your IP address (used for optional service allowlisting)
+- (Optional) `SKOOL_EMAIL`, `SKOOL_PASSWORD`, `SKOOL_GROUP_ID` - for personal Skool automation workflows
+
+After DNS propagates, open `https://n8n.yourdomain.com`.
 
 ---
 
-## GitOps Setup (Optional)
+## Automated n8n Updates
 
-For encrypted secrets and auto-deploy from GitHub:
+A weekly GitHub Action ([`.github/workflows/update-n8n.yml`](.github/workflows/update-n8n.yml))
+keeps the pinned n8n image current:
 
-### 1. Generate Age Key
-
-```bash
-mkdir -p ~/.config/sops/age
-age-keygen -o ~/.config/sops/age/keys.txt
-chmod 600 ~/.config/sops/age/keys.txt
-```
-
-### 2. Encrypt Secrets
-
-```bash
-cp .env secrets/production.env
-sops --encrypt --input-type binary --output-type binary secrets/production.env > secrets/production.env.enc
-shred -u secrets/production.env
-git add secrets/production.env.enc
-git commit -m "Add encrypted secrets"
-```
-
-### 3. Deploy with SOPS
-
-```bash
-export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt
-sops -d secrets/production.env.enc > .env
-docker compose up -d
-shred -u .env
-```
-
-### 4. Auto-Deploy (Optional)
-
-Push to `main` triggers GitHub Actions. The workflow dispatches to a self-hosted runner that pulls changes and runs [scripts/deploy.sh](scripts/deploy.sh).
+- Runs Mondays 06:00 UTC (plus manual `workflow_dispatch`).
+- Checks Docker Hub for the newest **stable** `n8nio/n8n` tag (ignores `latest`/`next`/`nightly`/`-rc`).
+- If newer than the pinned tag, it bumps `docker-compose.yml`, opens a PR, and auto-merges it.
+- This only updates the repo; the new version rolls out on the next `make deploy`.
 
 ---
 
@@ -126,28 +98,34 @@ Push to `main` triggers GitHub Actions. The workflow dispatches to a self-hosted
 - **MinIO Console**: `https://minio-console.yourdomain.com`
 - **Postiz**: `https://postiz.yourdomain.com`
 
+(Only the subdomains for enabled services are routed.)
+
 ---
 
 ## Day-to-Day Operations
 
-### Update Secrets
+### Modify the stack
 
 ```bash
-sops secrets/production.env.enc
-git add secrets/production.env.enc
-git commit -m "Update secrets"
-git push
-```
-
-### Modify Stack
-
-```bash
+# Edit a compose file, then commit and push
 nano docker-compose.yml
 git commit -am "Update stack"
 git push
+# Roll out from the deploy repo:
+#   cd ../n8n-hetzner-deploy && make deploy
 ```
 
-### View Logs
+### Rotate or change a secret
+
+Secrets live in `~/stack/.env` on the server (not in git). SSH to the host,
+edit the value, and restart:
+
+```bash
+nano ~/stack/.env
+docker compose --env-file ~/stack/.env up -d
+```
+
+### View logs
 
 ```bash
 docker compose logs -f n8n-core
@@ -156,13 +134,17 @@ docker compose ps
 
 ---
 
-## Security Features
+## Security
 
-- Secrets encrypted at rest with SOPS + age
-- Traefik TLS everywhere with automatic Let's Encrypt certificates
-- Optional IP allowlisting for sensitive services (HOME_IP)
-- No plaintext secrets committed to git
-- GitOps workflow with auditable deployments
+- **No secrets in git** - only a template of expected keys is committed; real values are generated server-side.
+- **TLS everywhere** - Traefik v3 with automatic Let's Encrypt certificates.
+- **Host hardening** - SSH key-only auth and firewalling, provisioned via cloud-init in the deploy repo.
+- **Optional IP allowlisting** - sensitive service subdomains can be restricted to `HOME_IP`.
+- **Least exposure** - `.env` is `0600`; Ansible secret tasks use `no_log` so values never appear in deploy output.
+
+> Note: Docker requires a plaintext `.env` at runtime, so secrets exist in
+> cleartext on the host while containers run. This is inherent to self-hosted
+> compute and is mitigated by least-privilege host access, not eliminated.
 
 ---
 
@@ -182,6 +164,7 @@ docker compose ps
 
 - [Blog](https://kjetilfuras.com)
 - [LinkedIn](https://www.linkedin.com/in/kjetil-furas/)
+
 ---
 
 Built by Kjetil Furås. Questions? Open an issue.
