@@ -7,7 +7,6 @@ postiz.env
 docker-compose-k*.yml
 
 # Allow encrypted files
-!secrets/*.enc
 !secrets/*.example
 
 # Runtime data
